@@ -1,0 +1,16 @@
+/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/ninja /Users/a533/CLionProjects/LearnOpenGL/shader_class.h -G Ninja -S /Users/a533/CLionProjects/LearnOpenGL -B /Users/a533/CLionProjects/LearnOpenGL/cmake-build-debug
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "/Users/a533/CLionProjects/LearnOpenGL/shader_class.h"
+
+
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "/Users/a533/CLionProjects/LearnOpenGL/shader_class.h"
+
+
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/a533/CLionProjects/LearnOpenGL/cmake-build-debug
