@@ -18,12 +18,13 @@ void main()
     vec3 normalWS = normalize(normal);
     vec3 viewDir = normalize(posWS - viewPos);
     vec4 diffuse = texture(texture_diffuse1, TexCoord);
-
-    vec3 normal = texture(texture_normal1, TexCoord).rgb;
+    vec4 normal = texture(texture_normal1, TexCoord);
     vec4 specular = texture(texture_specular1, TexCoord);
 
-    vec3 reflectDir = reflect(viewDir, normalWS);
-    vec4 result = texture(skybox, vec3(reflectDir.x, -reflectDir.y, reflectDir.z));// * texture(texture_height1, TexCoord);
+    //折射
+    float ratio = 1.00 / 1.52;  // air->water
+    vec3 refractDir = refract(viewDir, normalWS, ratio);
+    vec4 result = texture(skybox, vec3(refractDir.x, -refractDir.y, refractDir.z));
 
     FragColor = result;
 

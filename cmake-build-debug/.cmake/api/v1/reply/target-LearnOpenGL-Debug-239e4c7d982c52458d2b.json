@@ -242,7 +242,8 @@
 			[
 				2,
 				3,
-				4
+				4,
+				5
 			]
 		}
 	],
@@ -273,6 +274,11 @@
 		{
 			"backtrace" : 1,
 			"path" : "model.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "geo_shader.h",
 			"sourceGroupIndex" : 1
 		}
 	],

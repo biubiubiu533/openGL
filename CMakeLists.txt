@@ -17,7 +17,7 @@ include_directories(/opt/homebrew/Cellar/glm/0.9.9.8/include)
 
 add_executable(LearnOpenGL
         ./glad/src/glad.c
-        main.cpp camera_class.h mesh.h model.h)
+        main.cpp camera_class.h mesh.h model.h geo_shader.h)
 
 target_link_libraries(
         LearnOpenGL

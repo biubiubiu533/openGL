@@ -2,7 +2,9 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
+#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -15,6 +17,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+
+void drawSkybox(Shader skyShader, glm::mat4 view, glm::mat4 projection, unsigned int activeID, unsigned int cubemapTexture, unsigned int skyVAO);
+
 unsigned int load_texture(const char *path);
 unsigned int load_cube_map(vector<std::string> texture_faces);
 
@@ -40,6 +45,8 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -47,7 +54,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -72,23 +79,33 @@ int main()
 
     // build and compile our shader program
     // ------------------------------------
-    Shader skyShader("/Users/a533/CLionProjects/LearnOpenGL/vs/skybox.vs", "/Users/a533/CLionProjects/LearnOpenGL/fs/skybox.fs");
-    Shader lightShader("/Users/a533/CLionProjects/LearnOpenGL/vs/vshader.vs", "/Users/a533/CLionProjects/LearnOpenGL/fs/light_fshader.fs");
+    Shader skyShader("/Users/a533/CLionProjects/LearnOpenGL/vs/skybox.vs",  "/Users/a533/CLionProjects/LearnOpenGL/fs/skybox.fs");
+    Shader lightShader("/Users/a533/CLionProjects/LearnOpenGL/vs/vshader.vs",  "/Users/a533/CLionProjects/LearnOpenGL/fs/light_fshader.fs");
     Shader cubeShader("/Users/a533/CLionProjects/LearnOpenGL/vs/vshader.vs", "/Users/a533/CLionProjects/LearnOpenGL/fs/fshader.fs");
     Shader screenShader("/Users/a533/CLionProjects/LearnOpenGL/vs/framebuffer.vs", "/Users/a533/CLionProjects/LearnOpenGL/fs/framebuffer.fs");
+
+    Shader vNormalShader("/Users/a533/CLionProjects/LearnOpenGL/vs/visualize_normal.vs", "/Users/a533/CLionProjects/LearnOpenGL/fs/light_fshader.fs", "/Users/a533/CLionProjects/LearnOpenGL/vs/visualize_normal.gs");
 
     // load model
     // ------------------------------------
     Model ourModel("/Users/a533/CLionProjects/LearnOpenGL/nanosuit_reflection/nanosuit.obj");
 
-    vector<glm::vec3> vegetation;
-    vegetation.push_back(glm::vec3(-1.5f,  0.0f, -0.48f));
-    vegetation.push_back(glm::vec3( 1.5f,  0.0f,  0.51f));
-    vegetation.push_back(glm::vec3( 0.0f,  0.0f,  0.7f));
-    vegetation.push_back(glm::vec3(-0.3f,  0.0f, -2.3f));
-    vegetation.push_back(glm::vec3( 0.5f,  0.0f, -0.6f));
+    // uniform buffer
+    // ------------------------------------
+    unsigned int uboMat;
+    glGenBuffers(1, &uboMat);
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMat);
+    glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMat, 0, 2 * sizeof(glm::mat4));
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+    unsigned int mats_index = glGetUniformBlockIndex(vNormalShader.ID, "Matrices");
+    glUniformBlockBinding(vNormalShader.ID, mats_index, 0);
+
 
     // screen quad VAO
+    // ------------------------------------
     float quad[] = {
         // positions   // texCoords
         -1.0f,  1.0f,  0.0f, 1.0f,
@@ -185,7 +202,7 @@ int main()
     };
     unsigned int cubemapTexture = load_cube_map(faces);
 
-    //1.创建并绑定帧缓冲
+/*    //1.创建并绑定帧缓冲
     // -------------
     unsigned int fbo;
     glGenFramebuffers(1, &fbo);
@@ -215,7 +232,7 @@ int main()
     //4.检查帧缓冲是否完整
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
 
     // bind texture sampler
     // -----------
@@ -223,6 +240,7 @@ int main()
     skyShader.setInt("skybox", 0);
 
     cubeShader.use();
+    cubeShader.setInt("material.skybox", 4);
     cubeShader.setFloat("material.shininess", 32.0f);
 
     //directional light
@@ -248,7 +266,8 @@ int main()
         cubeShader.setFloat((uniformName+"linear").c_str(), 0.09f);
         cubeShader.setFloat((uniformName+"quadratic").c_str(), 0.032f);
     }
-    cubeShader.setInt("material.skybox", 4);
+
+    glEnable(GL_MULTISAMPLE);
 
     // render loop
     // -----------
@@ -296,61 +315,34 @@ int main()
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
 
-        // view/projection transformations
+        // MVP transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         cubeShader.setMat4("projection", projection);
         cubeShader.setMat4("view", view);
 
-        // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
+        model = glm::scale(model, glm::vec3(0.3f, 0.3f, 0.3f));	// it's a bit too big for our scene, so scale it down
         cubeShader.setMat4("model", model);
-        glm::mat4 nmodel = transpose(inverse(model));
-        cubeShader.setMat4("nmodel", nmodel);
         ourModel.Draw(cubeShader);
 
+        //法线
+        /*vNormalShader.use();
+        glBindBuffer(GL_UNIFORM_BUFFER, uboMat);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+        vNormalShader.setMat4("model", model);
+        vNormalShader.setMat4("projection", projection);
+        ourModel.Draw(vNormalShader);*/
+
         // render skybox
-        glDepthFunc(GL_LEQUAL);  //depth=1.0
-        skyShader.use();
-        glBindVertexArray(skyVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        // -----------------------------
         view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
-        skyShader.setMat4("view", view);
-        skyShader.setMat4("projection", projection);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glDepthFunc(GL_LESS);
+        drawSkybox(skyShader, view, projection, 0, cubemapTexture, skyVAO);
 
         // render transparent
         // -----------------------------
-/*        glDepthMask(GL_FALSE);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        cubeShader.use();
-
-        glBindVertexArray(transparentVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, grassTexture);
-
-        // sort obj from near to far
-        std::map<float, glm::vec3> sorted;
-        for (int i = 0; i < vegetation.size(); i++){
-            float distance = glm::length(camera.Position - vegetation[i]);
-            sorted[distance] = vegetation[i];
-        }
-
-        for(std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); it++){
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, it->second);
-            cubeShader.setMat4("model", model);
-            nmodel = transpose(inverse(model));
-            cubeShader.setMat4("nmodel", nmodel);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
-        glDepthMask(GL_TRUE);*/
 
 
         //第二阶段：使用默认的帧缓冲
@@ -442,6 +434,56 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
+}
+
+//draw skybox
+void drawSkybox(Shader skyShader, glm::mat4 view, glm::mat4 projection, unsigned int activeID, unsigned int cubemapTexture, unsigned int skyVAO){
+    glDepthFunc(GL_LEQUAL);  //depth=1.0
+    skyShader.use();
+    glBindVertexArray(skyVAO);
+    glActiveTexture(GL_TEXTURE0 + activeID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+    skyShader.setMat4("view", view);
+    skyShader.setMat4("projection", projection);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glDepthFunc(GL_LESS);
+}
+
+//draw transparent
+void drawTransparent(Shader transparentShader, glm::mat4 view, glm::mat4 projection, unsigned int activeID, unsigned int texture, unsigned int transparentVAO){
+    vector<glm::vec3> position;
+    position.push_back(glm::vec3(-1.5f,  0.0f, -0.48f));
+    position.push_back(glm::vec3( 1.5f,  0.0f,  0.51f));
+    position.push_back(glm::vec3( 0.0f,  0.0f,  0.7f));
+    position.push_back(glm::vec3(-0.3f,  0.0f, -2.3f));
+    position.push_back(glm::vec3( 0.5f,  0.0f, -0.6f));
+
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    transparentShader.use();
+
+    glBindVertexArray(transparentVAO);
+    glActiveTexture(GL_TEXTURE0 + activeID);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    // sort obj from near to far
+    std::map<float, glm::vec3> sorted;
+    for (int i = 0; i < position.size(); i++){
+        float distance = glm::length(camera.Position - position[i]);
+        sorted[distance] = position[i];
+    }
+
+    for(std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); it++){
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, it->second);
+        transparentShader.setMat4("model", model);
+        glm::mat4 nmodel = transpose(inverse(model));
+        transparentShader.setMat4("nmodel", nmodel);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
+    glDepthMask(GL_TRUE);
 }
 
 //texture
